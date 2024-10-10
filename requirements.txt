@@ -1,0 +1,8 @@
+elasticsearch
+langchain-experimental
+langchain-community
+langchain-openai
+langchain
+pypdf
+fastapi
+uvicorn

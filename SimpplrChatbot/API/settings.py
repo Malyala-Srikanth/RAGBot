@@ -1,0 +1,31 @@
+import os
+
+from pydantic import ConfigDict
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """
+    Settings class to hold all the environment variables
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    LOG_LEVEL: str = "DEBUG"
+    PROCESS_POOL_WORKERS: int = 10
+    CHAT_HISTORY_LENGTH: int = 10
+
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    LLM_MODEL: str = "claude-3-5-sonnet-20240620"
+    LLM_TEMPERATURE: float = 0.7
+    LLM_TOP_P: float = 1.0
+    LLM_TOP_K: int = 0
+    LLM_MAX_TOKENS: int = 8000
+
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+
+
+settings = Settings()
