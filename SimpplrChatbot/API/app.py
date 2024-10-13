@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+
 
 from dotenv import load_dotenv
 from langchain.chat_models import ChatOpenAI
@@ -11,6 +11,7 @@ from langchain.chains import RetrievalQA
 from langchain.embeddings import OpenAIEmbeddings
 from Data.document_loader import DocumentLoader
 from API.settings import settings
+from Utils.validation import Question
 
 # Load environment variables
 load_dotenv()
@@ -65,10 +66,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-class Question(BaseModel):
-    question: str
 
 
 @app.get("/health-check")
