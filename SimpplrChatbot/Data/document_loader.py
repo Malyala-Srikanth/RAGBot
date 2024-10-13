@@ -12,13 +12,17 @@ from dotenv import load_dotenv
 
 class DocumentLoader:
     def __init__(
-        self, data_path: str, index_name: str, elasticsearch_url: str
+        self,
+        data_path: str,
+        index_name: str,
+        elasticsearch_url: str,
+        embeddings: OpenAIEmbeddings,
     ):  # noqa: E501
         load_dotenv()
         self.data_path = data_path
         self.index_name = index_name
         self.elasticsearch_url = elasticsearch_url
-        self.embeddings = OpenAIEmbeddings()
+        self.embeddings = embeddings
 
     async def load_documents(self) -> List[str]:
         # Load text files
@@ -107,8 +111,9 @@ class DocumentLoader:
 
 
 if __name__ == "__main__":
+    embeddings = OpenAIEmbeddings()
     data_path = "/Users/malyala/Desktop/SimpplrChatbot/SimpplrChatbot/pdfs"
     document_loader = DocumentLoader(
-        data_path, "simpplr-chatbot", "http://localhost:9200"
+        data_path, "simpplr-chatbot", "http://localhost:9200", embeddings
     )  # noqa: E501
     vector_store = asyncio.run(document_loader.load_split_and_index())

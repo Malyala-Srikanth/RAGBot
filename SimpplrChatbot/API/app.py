@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,11 +10,54 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains import RetrievalQA
 from langchain.embeddings import OpenAIEmbeddings
 from Data.document_loader import DocumentLoader
+from API.settings import settings
 
 # Load environment variables
 load_dotenv()
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        raise ValueError("OPENAI_API_KEY not found in environment variables")
+
+    global vector_store
+
+    embeddings = OpenAIEmbeddings(model=settings.EMBEDDING_MODEL)
+
+    # Startup code here
+    document_loader = DocumentLoader(
+        settings.DATA_PATH,
+        settings.INDEX_NAME,
+        settings.ELASTICSEARCH_URL,
+        embeddings,  # noqa: E501
+    )
+    vector_store = await document_loader.load_split_and_index()
+
+    # Initialize language model
+    llm = ChatOpenAI(
+        temperature=settings.LLM_TEMPERATURE,
+        top_p=settings.LLM_TOP_P,
+        model_name=settings.LLM_MODEL,
+    )
+
+    # Initialize qa_chain
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=vector_store.as_retriever(),
+        return_source_documents=True,
+    )
+
+    # Add qa_chain to app state
+    app.state.qa_chain = qa_chain
+
+    yield
+    # Shutdown code here (if needed)
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Add CORS middleware
 app.add_middleware(
@@ -22,33 +66,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-# Initialize OpenAI API key
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if not openai_api_key:
-    raise ValueError("OPENAI_API_KEY not found in environment variables")
-
-# Initialize embeddings and vector store
-embeddings = OpenAIEmbeddings()
-
-# Initialize DocumentLoader and load documents
-data_path = os.getenv("DATA_PATH", "./data")
-elasticsearch_url = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
-index_name = "simpplr-chatbot"
-
-document_loader = DocumentLoader(data_path, index_name, elasticsearch_url)
-vector_store = document_loader.load_split_and_index()
-
-# Initialize language model
-llm = ChatOpenAI(temperature=0, model_name="gpt-3.5-turbo")
-
-# Create RetrievalQA chain
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
-    retriever=vector_store.as_retriever(),
-    return_source_documents=True,
 )
 
 
@@ -64,7 +81,7 @@ async def health_check():
 @app.post("/query")
 async def query(question: Question):
     try:
-        result = qa_chain({"query": question.question})
+        result = app.state.qa_chain({"query": question.question})
         answer = result["result"]
         sources = [doc.page_content for doc in result["source_documents"]]
 

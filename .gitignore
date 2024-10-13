@@ -86,3 +86,6 @@ coverage.xml
 *.tmp
 *.temp
 .sass-cache/
+
+# Ignore export_env.sh script
+export_env.sh
