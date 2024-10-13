@@ -2,6 +2,9 @@ import os
 
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -26,6 +29,11 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = 200
 
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    DATA_PATH: str = os.getenv("DATA_PATH", "./data")
+    INDEX_NAME: str = os.getenv("INDEX_NAME", "simpplr-chatbot")
+    ELASTICSEARCH_URL: str = os.getenv(
+        "ELASTICSEARCH_URL", "http://localhost:9200"
+    )  # noqa: E501
 
 
 settings = Settings()

@@ -4,10 +4,12 @@ from typing import List
 from langchain.document_loaders import DirectoryLoader, TextLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter  # noqa: E501
 from langchain_experimental.text_splitter import SemanticChunker
+from langchain.docstore.document import Document
+from langchain_core.embeddings import Embeddings
 
 from langchain.vectorstores import ElasticVectorSearch
-from langchain.embeddings import OpenAIEmbeddings
-from dotenv import load_dotenv
+from Utils.utils import logging
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 class DocumentLoader:
@@ -16,9 +18,8 @@ class DocumentLoader:
         data_path: str,
         index_name: str,
         elasticsearch_url: str,
-        embeddings: OpenAIEmbeddings,
+        embeddings: Embeddings,
     ):  # noqa: E501
-        load_dotenv()
         self.data_path = data_path
         self.index_name = index_name
         self.elasticsearch_url = elasticsearch_url
@@ -42,7 +43,7 @@ class DocumentLoader:
         return documents
 
     async def restructure_documents(
-        self, documents: List[str]
+        self, documents: List[Document]
     ) -> List[str]:  # noqa: E501
         restructured_documents = []
         for doc in documents:
@@ -61,11 +62,11 @@ class DocumentLoader:
 
     async def split_documents(
         self,
-        documents: List[str],
+        documents: List[Document],
         chunk_size: int = 1000,
         chunk_overlap: int = 200,  # noqa: E501
         type_of_splitter: str = "recursive",
-    ) -> List[str]:
+    ) -> List[Document]:
         if type_of_splitter == "recursive":
             text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=chunk_size, chunk_overlap=chunk_overlap
@@ -79,38 +80,68 @@ class DocumentLoader:
         )  # noqa: E501
         return split_docs
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),  # noqa: E501
+    )
+    async def generate_embeddings(self, texts):
+        try:
+            embeddings = await asyncio.to_thread(
+                self.embeddings.embed_documents, texts
+            )  # noqa: E501
+            if not embeddings:
+                raise ValueError("Embeddings list is empty")
+            return embeddings
+        except Exception as e:
+            logging.error(f"Error generating embeddings: {str(e)}")
+            raise
+
     async def index_documents(
-        self, documents: List[str]
+        self, documents: List[Document]
     ) -> ElasticVectorSearch:  # noqa: E501
-        vector_store = await asyncio.to_thread(
-            ElasticVectorSearch.from_documents,
-            documents,
-            self.embeddings,
-            elasticsearch_url=self.elasticsearch_url,
-            index_name=self.index_name,
-        )
-        return vector_store
+        logging.info(f"Indexing {len(documents)} documents")
+
+        if not documents:
+            raise ValueError("No documents to index")
+
+        texts = [doc.page_content for doc in documents]
+
+        try:
+            embeddings = await self.generate_embeddings(texts)
+            logging.info(f"Generated {len(embeddings)} embeddings")
+
+            vector_store = await asyncio.to_thread(
+                ElasticVectorSearch.from_documents,
+                documents,
+                self.embeddings,
+                elasticsearch_url=self.elasticsearch_url,
+                index_name=self.index_name,
+            )
+            return vector_store
+        except Exception as e:
+            logging.error(f"Error during indexing: {str(e)}")
+            raise
 
     async def load_split_and_index(
         self, chunk_size: int = 1000, chunk_overlap: int = 200
     ) -> ElasticVectorSearch:
-        print("Loading documents")
+        logging.info("Loading documents")
         documents = await self.load_documents()
-        print("Restructuring documents")
+        logging.info(f"Loaded {len(documents)} documents")
+        logging.info("Restructuring documents")
         restructured_docs = await self.restructure_documents(documents)
-        print("Splitting documents")
+        logging.info("Splitting documents")
         split_docs = await self.split_documents(
             restructured_docs, chunk_size, chunk_overlap
         )
-        for doc in split_docs:
-            print(doc.page_content)
-            print("*" * 100)
-        print("Indexing documents")
+        logging.info("Indexing documents")
         vector_store = await self.index_documents(split_docs)
         return vector_store
 
 
 if __name__ == "__main__":
+    from langchain.embeddings import OpenAIEmbeddings
+
     embeddings = OpenAIEmbeddings()
     data_path = "/Users/malyala/Desktop/SimpplrChatbot/SimpplrChatbot/pdfs"
     document_loader = DocumentLoader(

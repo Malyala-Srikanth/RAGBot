@@ -22,8 +22,6 @@ async def lifespan(app: FastAPI):
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY not found in environment variables")
 
-    global vector_store
-
     embeddings = OpenAIEmbeddings(model=settings.EMBEDDING_MODEL)
 
     # Startup code here
