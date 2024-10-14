@@ -32,7 +32,11 @@ async def lifespan(app: FastAPI):
         settings.ELASTICSEARCH_URL,
         embeddings,  # noqa: E501
     )
-    vector_store = await document_loader.load_split_and_index()
+    vector_store = await document_loader.load_split_and_index(
+        chunk_size=settings.CHUNK_SIZE,
+        chunk_overlap=settings.CHUNK_OVERLAP,
+        type_of_splitter=settings.SPLITTER_TYPE,
+    )
 
     # Initialize language model
     llm = ChatOpenAI(

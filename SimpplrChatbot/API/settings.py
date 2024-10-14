@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
+    SPLITTER_TYPE: str = "recursive"
 
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
     DATA_PATH: str = os.getenv("DATA_PATH", "./data")

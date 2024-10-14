@@ -123,7 +123,10 @@ class DocumentLoader:
             raise
 
     async def load_split_and_index(
-        self, chunk_size: int = 1000, chunk_overlap: int = 200
+        self,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 200,
+        type_of_splitter: str = "recursive",
     ) -> ElasticVectorSearch:
         logging.info("Loading documents")
         documents = await self.load_documents()
@@ -132,7 +135,7 @@ class DocumentLoader:
         restructured_docs = await self.restructure_documents(documents)
         logging.info("Splitting documents")
         split_docs = await self.split_documents(
-            restructured_docs, chunk_size, chunk_overlap
+            restructured_docs, chunk_size, chunk_overlap, type_of_splitter
         )
         logging.info("Indexing documents")
         vector_store = await self.index_documents(split_docs)
