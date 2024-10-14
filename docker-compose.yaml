@@ -56,7 +56,7 @@ services:
       - CHUNK_SIZE=${CHUNK_SIZE}
       - CHUNK_OVERLAP=${CHUNK_OVERLAP}
     entrypoint: /bin/bash
-    command: -c "uvicorn API.app:app --reload --host 0.0.0.0 --port "
+    command: -c "uvicorn API.app:app --reload --host 0.0.0.0 --port 8000"
     networks:
       - simpplr-chatbot
 
