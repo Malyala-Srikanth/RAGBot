@@ -4,17 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-
-from dotenv import load_dotenv
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
-from langchain.embeddings import OpenAIEmbeddings
-from Data.document_loader import DocumentLoader
-from API.settings import settings
+from Data.query_helper import QueryHelper
 from Utils.validation import Question
-
-# Load environment variables
-load_dotenv()
 
 
 @asynccontextmanager
@@ -23,38 +14,9 @@ async def lifespan(app: FastAPI):
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY not found in environment variables")
 
-    embeddings = OpenAIEmbeddings(model=settings.EMBEDDING_MODEL)
-
-    # Startup code here
-    document_loader = DocumentLoader(
-        settings.DATA_PATH,
-        settings.INDEX_NAME,
-        settings.ELASTICSEARCH_URL,
-        embeddings,  # noqa: E501
-    )
-    vector_store = await document_loader.load_split_and_index(
-        chunk_size=settings.CHUNK_SIZE,
-        chunk_overlap=settings.CHUNK_OVERLAP,
-        type_of_splitter=settings.SPLITTER_TYPE,
-    )
-
-    # Initialize language model
-    llm = ChatOpenAI(
-        temperature=settings.LLM_TEMPERATURE,
-        top_p=settings.LLM_TOP_P,
-        model_name=settings.LLM_MODEL,
-    )
-
-    # Initialize qa_chain
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=vector_store.as_retriever(),
-        return_source_documents=True,
-    )
-
-    # Add qa_chain to app state
-    app.state.qa_chain = qa_chain
+    # Intialiazing query helper
+    query_helper = QueryHelper()
+    app.state.query_helper = query_helper
 
     yield
     # Shutdown code here (if needed)
@@ -80,7 +42,7 @@ async def health_check():
 @app.post("/query")
 async def query(question: Question):
     try:
-        result = app.state.qa_chain({"query": question.question})
+        result = app.state.query_helper.query(question)
         answer = result["result"]
         sources = [doc.page_content for doc in result["source_documents"]]
 

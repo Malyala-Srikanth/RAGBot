@@ -28,5 +28,6 @@ SimpplrChatbot
 1. Ensure you have docker on your system and running
 2. Clone the repository and cd into SimpplrChatbot outer folder which will be the working directory
 3. copy .env.example to .env and make necessary changes
-3. `docker build -t simpplrchatbot . ` will copy and build the docker image
-4.
+4. `docker build -t simpplrchatbot . ` will copy and build the docker image for backend
+5. `docker-compose --env-file ./SimpplrChatbot/.env up` will build and run both elasticsearch server service and backend service.
+6. Run `python SimpplrChatbot/evaluater.py` to run evaluation once the services are up
