@@ -1,3 +1,4 @@
+import os
 import re
 import asyncio
 from typing import List
@@ -44,7 +45,9 @@ class DocumentLoader:
 
 
 if __name__ == "__main__":
-    data_path = "/Users/malyala/Desktop/SimpplrChatbot/SimpplrChatbot/pdfs"
+    data_path = os.environ.get("DATA_PATH", "")
+    if not data_path:
+        raise ValueError("Data path not defined in environment variables")
     document_loader = DocumentLoader(data_path)
     processed_docs = asyncio.run(document_loader.load_and_process())
     print(f"Processed {len(processed_docs)} documents")

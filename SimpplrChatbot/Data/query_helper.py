@@ -1,5 +1,9 @@
-from langchain.chains import RetrievalQA
+from langchain.chains import (
+    RetrievalQA,
+    ConversationChain,
+)  # Add ConversationChain import
 from langchain.chat_models import ChatOpenAI
+from langchain.memory import ConversationBufferMemory  # Add this import
 
 from Data.document_loader import DocumentLoader
 from Data.embedding_based_retriever import EmbeddingBasedRetriever
@@ -7,6 +11,8 @@ from Data.keyword_match_retriever import KeywordMatchRetriever
 from API.settings import settings
 from Utils.utils import logger
 import asyncio
+
+conversations = {}
 
 
 class QueryHelper:
@@ -24,7 +30,7 @@ class QueryHelper:
         self.document_loader = DocumentLoader(settings.DATA_PATH)
         documents = await self.document_loader.load_and_process()
 
-        llm = ChatOpenAI(
+        self.llm = ChatOpenAI(
             temperature=settings.LLM_TEMPERATURE,
             top_p=settings.LLM_TOP_P,
             model_name=settings.LLM_MODEL,
@@ -36,24 +42,36 @@ class QueryHelper:
             )
             await self.embedding_based_retriever.index_documents(documents)
             self.vector_store = await self.embedding_based_retriever.get_vector_store()
-            retriever = self.vector_store.as_retriever()
+            self.retriever = self.vector_store.as_retriever()
         elif self.approach == "keyword-match":
             self.keyword_match_retriever = KeywordMatchRetriever(
                 self.index_name, self.elasticsearch_url
             )
             await self.keyword_match_retriever.index_documents(documents)
-            retriever = self.keyword_match_retriever.get_retriever()
+            self.retriever = self.keyword_match_retriever.get_retriever()
 
         else:
             raise NotImplementedError(f"Unsupported approach: {self.approach}")
 
-        self.qa_chain = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever,
-            return_source_documents=True,
-        )
-
     async def query(self, query: str):
         logger.info(f"Using {self.approach} retriever")
-        return await self.qa_chain.ainvoke({"query": query})
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=self.llm,
+            chain_type="stuff",
+            retriever=self.retriever,
+            return_source_documents=True,
+        )
+        return await qa_chain.ainvoke({"query": query})
+
+    async def chat(self, message: str, session_id: str):
+        # Check if the session already exists
+        if session_id not in conversations:
+            memory = ConversationBufferMemory()
+            conversation = ConversationChain(llm=self.llm, memory=memory)
+            conversations[session_id] = conversation
+        else:
+            conversation = conversations[session_id]
+
+        # Process the incoming message and get a response
+        response = await conversation.predict(input=message)
+        return response  # Return the response to the user

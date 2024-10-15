@@ -1,9 +1,7 @@
 import os
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
 from Data.query_helper import QueryHelper
 from Utils.validation import Question
 
@@ -14,7 +12,7 @@ async def lifespan(app: FastAPI):
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY not found in environment variables")
 
-    # Intialiazing query helper
+    # Initializing query helper
     query_helper = QueryHelper()
     app.state.query_helper = query_helper
 
@@ -47,5 +45,22 @@ async def query(question: Question):
         sources = [doc.page_content for doc in result["source_documents"]]
 
         return {"answer": answer, "sources": sources}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/chat")
+async def chat(session_id: str, new_query: Question):
+    try:
+        # Process the new query
+        result = app.state.query_helper.chat(new_query, session_id)
+        answer = result["result"]
+        sources = [doc.page_content for doc in result["source_documents"]]
+
+        return {
+            "session_id": session_id,
+            "answer": answer,
+            "sources": sources,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
