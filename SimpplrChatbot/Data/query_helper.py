@@ -6,11 +6,13 @@ from langchain.retrievers import ElasticSearchBM25Retriever
 
 from Data.document_loader import DocumentLoader
 from API.settings import settings
+from Utils.utils import logger
 
 
 class QueryHelper:
     def __init__(self):
         self.index_name = settings.INDEX_NAME
+        self.approach = settings.RETRIEVER_APPROACH
         self.elasticsearch_url = settings.ELASTICSEARCH_URL
         self.embeddings = OpenAIEmbeddings(model=settings.EMBEDDING_MODEL)
         self.vector_store = ElasticVectorSearch(
@@ -26,8 +28,9 @@ class QueryHelper:
         )
         self.es_client = self.vector_store.client
 
-    def query(self, query: str, approach: str = "embedding-based"):
-        if approach == "embedding-based":
+    def query(self, query: str):
+        if self.approach == "embedding-based":
+            logger.info("Using embedding based retriever")
             vector_store = self.document_loader.load_split_and_index(
                 chunk_size=settings.CHUNK_SIZE,
                 chunk_overlap=settings.CHUNK_OVERLAP,
@@ -50,7 +53,8 @@ class QueryHelper:
             )
 
             return qa_chain.invoke({"query": query})
-        elif approach == "keyword-match":
+        elif self.approach == "keyword-match":
+            logger.info("Using Keyword based retriever")
             # Initialize BM25 retriever
             bm25_retriever = ElasticSearchBM25Retriever(
                 client=self.es_client,
