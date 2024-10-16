@@ -11,7 +11,6 @@ from Data.keyword_match_retriever import KeywordMatchRetriever
 from Data.knowledge_graph_retriever import GraphRAG
 from API.settings import settings
 from Utils.utils import logger
-import asyncio
 
 conversations = {}
 
@@ -51,13 +50,14 @@ class QueryHelper:
         elif self.approach == "knowledge-graph":
             logger.info("Loading Knowledge Graph" + "*" * 2000)
             self.graph_rag = GraphRAG()
-            self.graph_rag.process_documents(documents)
+            await self.graph_rag.process_documents(documents)
         else:
             raise NotImplementedError(f"Unsupported approach: {self.approach}")
 
     async def query(self, query: str):
+        print("2", query)
         if self.approach == "knowledge-graph":
-            response = self.graph_rag.query(query=query)
+            response = await self.graph_rag.query(query=query)
             return response
 
         logger.info(f"Using {self.approach} retriever")

@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from Data.query_helper import QueryHelper
 from Utils.validation import Question
+from Utils.utils import logger
 
 
 @asynccontextmanager
@@ -41,7 +42,8 @@ async def health_check():
 @app.post("/query")
 async def query(question: Question):
     try:
-        result = app.state.query_helper.query(question)
+        result = await app.state.query_helper.query(question.question)
+        logger.info("result obtained")
         answer = result["result"]
         sources = [doc.page_content for doc in result["source_documents"]]
 

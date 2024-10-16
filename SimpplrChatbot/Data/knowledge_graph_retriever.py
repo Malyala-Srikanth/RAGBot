@@ -7,6 +7,7 @@ from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain.callbacks import get_openai_callback
 from langchain.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel, Field
+from langchain.docstore.document import Document
 
 from sklearn.metrics.pairwise import cosine_similarity
 import matplotlib.pyplot as plt
@@ -30,6 +31,8 @@ import numpy as np
 
 from spacy.cli import download
 from spacy.lang.en import English
+
+import asyncio
 
 
 # Set the OpenAI API key environment variable
@@ -55,7 +58,7 @@ class DocumentProcessor:
         )
         self.embeddings = OpenAIEmbeddings()
 
-    def process_documents(self, documents):
+    async def process_documents(self, documents):
         """
         Processes a list of documents by splitting them into smaller chunks and creating a vector store.
 
@@ -65,18 +68,19 @@ class DocumentProcessor:
         Returns:
         - tuple: A tuple containing:
           - splits (list of str): The list of split document chunks.
-          - vector_store (FAISS): A FAISS vector store created from the split document chunks and their embeddings.
+          - vector_store (ElasticsearchStore): A ElasticsearchStore vector store created from the split document chunks and their embeddings.
         """
-        splits = self.text_splitter.split_documents(documents)
+        splits = await asyncio.to_thread(self.text_splitter.split_documents, documents)
         vector_store = ElasticsearchStore(
             es_url=settings.ELASTICSEARCH_URL,
             index_name=settings.INDEX_NAME,
             embedding=self.embeddings,
         )
+        await asyncio.to_thread(vector_store.add_documents, splits)
 
         return splits, vector_store
 
-    def create_embeddings_batch(self, texts, batch_size=32):
+    async def create_embeddings_batch(self, texts, batch_size=32):
         """
         Creates embeddings for a list of texts in batches.
 
@@ -90,11 +94,13 @@ class DocumentProcessor:
         embeddings = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            batch_embeddings = self.embeddings.embed_documents(batch)
+            batch_embeddings = await asyncio.to_thread(
+                self.embeddings.embed_documents, batch
+            )
             embeddings.extend(batch_embeddings)
         return np.array(embeddings)
 
-    def compute_similarity_matrix(self, embeddings):
+    async def compute_similarity_matrix(self, embeddings):
         """
         Computes a cosine similarity matrix for a given set of embeddings.
 
@@ -104,7 +110,7 @@ class DocumentProcessor:
         Returns:
         - numpy.ndarray: A cosine similarity matrix for the input embeddings.
         """
-        return cosine_similarity(embeddings)
+        return await asyncio.to_thread(cosine_similarity, embeddings)
 
 
 # Define the Concepts class
@@ -131,7 +137,7 @@ class KnowledgeGraph:
         self.nlp = self._load_spacy_model()
         self.edges_threshold = 0.8
 
-    def build_graph(self, splits, llm, embedding_model):
+    async def build_graph(self, splits, llm, embedding_model):
         """
         Builds the knowledge graph by adding nodes, creating embeddings, extracting concepts, and adding edges.
 
@@ -143,12 +149,12 @@ class KnowledgeGraph:
         Returns:
         - None
         """
-        self._add_nodes(splits)
-        embeddings = self._create_embeddings(splits, embedding_model)
-        self._extract_concepts(splits, llm)
-        self._add_edges(embeddings)
+        await self._add_nodes(splits)
+        embeddings = await self._create_embeddings(splits, embedding_model)
+        await self._extract_concepts(splits, llm)
+        await self._add_edges(embeddings)
 
-    def _add_nodes(self, splits):
+    async def _add_nodes(self, splits):
         """
         Adds nodes to the graph from the document splits.
 
@@ -161,7 +167,7 @@ class KnowledgeGraph:
         for i, split in enumerate(splits):
             self.graph.add_node(i, content=split.page_content)
 
-    def _create_embeddings(self, splits, embedding_model):
+    async def _create_embeddings(self, splits, embedding_model):
         """
         Creates embeddings for the document splits using the embedding model.
 
@@ -173,9 +179,9 @@ class KnowledgeGraph:
         - numpy.ndarray: An array of embeddings for the document splits.
         """
         texts = [split.page_content for split in splits]
-        return embedding_model.embed_documents(texts)
+        return await asyncio.to_thread(embedding_model.embed_documents, texts)
 
-    def _compute_similarities(self, embeddings):
+    async def _compute_similarities(self, embeddings):
         """
         Computes the cosine similarity matrix for the embeddings.
 
@@ -185,7 +191,7 @@ class KnowledgeGraph:
         Returns:
         - numpy.ndarray: A cosine similarity matrix for the embeddings.
         """
-        return cosine_similarity(embeddings)
+        return await asyncio.to_thread(cosine_similarity, embeddings)
 
     def _load_spacy_model(self):
         """
@@ -204,7 +210,7 @@ class KnowledgeGraph:
             download("en_core_web_sm")
             return spacy.load("en_core_web_sm")
 
-    def _extract_concepts_and_entities(self, content, llm):
+    async def _extract_concepts_and_entities(self, content, llm):
         """
         Extracts concepts and named entities from the content using spaCy and a large language model.
 
@@ -219,7 +225,7 @@ class KnowledgeGraph:
             return self.concept_cache[content]
 
         # Extract named entities using spaCy
-        doc = self.nlp(content)
+        doc = await asyncio.to_thread(self.nlp, content)
         named_entities = [
             ent.text
             for ent in doc.ents
@@ -232,15 +238,18 @@ class KnowledgeGraph:
             template="Extract key concepts (excluding named entities) from the following text:\n\n{text}\n\nKey concepts:",
         )
         concept_chain = concept_extraction_prompt | llm.with_structured_output(Concepts)
-        general_concepts = concept_chain.invoke({"text": content}).concepts_list
+        general_concepts = await asyncio.to_thread(
+            concept_chain.invoke, {"text": content}
+        )
 
         # Combine named entities and general concepts
-        all_concepts = list(set(named_entities + general_concepts))
+        all_concepts = list(set(named_entities + general_concepts.concepts_list))
+        print("ALL CONCEPTS:", all_concepts)
 
         self.concept_cache[content] = all_concepts
         return all_concepts
 
-    def _extract_concepts(self, splits, llm):
+    async def _extract_concepts(self, splits, llm):
         """
         Extracts concepts for all document splits using multi-threading.
 
@@ -265,10 +274,10 @@ class KnowledgeGraph:
                 desc="Extracting concepts and entities",
             ):
                 node = future_to_node[future]
-                concepts = future.result()
+                concepts = await future.result()
                 self.graph.nodes[node]["concepts"] = concepts
 
-    def _add_edges(self, embeddings):
+    async def _add_edges(self, embeddings):
         """
         Adds edges to the graph based on the similarity of embeddings and shared concepts.
 
@@ -278,7 +287,7 @@ class KnowledgeGraph:
         Returns:
         - None
         """
-        similarity_matrix = self._compute_similarities(embeddings)
+        similarity_matrix = await self._compute_similarities(embeddings)
         num_nodes = len(self.graph.nodes)
 
         for node1 in tqdm(range(num_nodes), desc="Adding edges"):
@@ -288,7 +297,7 @@ class KnowledgeGraph:
                     shared_concepts = set(self.graph.nodes[node1]["concepts"]) & set(
                         self.graph.nodes[node2]["concepts"]
                     )
-                    edge_weight = self._calculate_edge_weight(
+                    edge_weight = await self._calculate_edge_weight(
                         node1, node2, similarity_score, shared_concepts
                     )
                     self.graph.add_edge(
@@ -299,7 +308,7 @@ class KnowledgeGraph:
                         shared_concepts=list(shared_concepts),
                     )
 
-    def _calculate_edge_weight(
+    async def _calculate_edge_weight(
         self, node1, node2, similarity_score, shared_concepts, alpha=0.7, beta=0.3
     ):
         """
@@ -325,7 +334,7 @@ class KnowledgeGraph:
         )
         return alpha * similarity_score + beta * normalized_shared_concepts
 
-    def _lemmatize_concept(self, concept):
+    async def _lemmatize_concept(self, concept):
         """
         Lemmatizes a given concept.
 
@@ -373,7 +382,7 @@ class QueryEngine:
         )
         return answer_check_prompt | self.llm.with_structured_output(AnswerCheck)
 
-    def _check_answer(self, query: str, context: str) -> Tuple[bool, str]:
+    async def _check_answer(self, query: str, context: str) -> Tuple[bool, str]:
         """
         Checks if the current context provides a complete answer to the query.
 
@@ -386,10 +395,12 @@ class QueryEngine:
           - is_complete (bool): Whether the context provides a complete answer.
           - answer (str): The answer based on the context, if complete.
         """
-        response = self.answer_check_chain.invoke({"query": query, "context": context})
+        response = await asyncio.to_thread(
+            self.answer_check_chain.invoke, {"query": query, "context": context}
+        )
         return response.is_complete, response.answer
 
-    def _expand_context(
+    async def _expand_context(
         self, query: str, relevant_docs
     ) -> Tuple[str, List[int], Dict[int, str], str]:
         """
@@ -449,8 +460,8 @@ class QueryEngine:
         # Initialize priority queue with closest nodes from relevant docs
         for doc in relevant_docs:
             # Find the most similar node in the knowledge graph for each relevant document
-            closest_nodes = self.vector_store.similarity_search_with_score(
-                doc.page_content, k=1
+            closest_nodes = await asyncio.to_thread(
+                self.vector_store.similarity_search_with_score, doc.page_content, k=1
             )
             closest_node_content, similarity_score = closest_nodes[0]
 
@@ -466,7 +477,7 @@ class QueryEngine:
             priority = 1 / similarity_score
             heapq.heappush(priority_queue, (priority, closest_node))
             distances[closest_node] = priority
-
+        print("priority list found")
         step = 0
         while priority_queue:
             # Get the node with the highest priority (lowest distance value)
@@ -497,15 +508,18 @@ class QueryEngine:
                 print("-" * 50)
 
                 # Check if we have a complete answer with the current context
-                is_complete, answer = self._check_answer(query, expanded_context)
+                is_complete, answer = await self._check_answer(query, expanded_context)
                 if is_complete:
                     final_answer = answer
                     break
 
                 # Process the concepts of the current node
-                node_concepts_set = set(
-                    self.knowledge_graph._lemmatize_concept(c) for c in node_concepts
-                )
+                node_concepts_set = set()
+                for c in node_concepts:
+                    node_c = await self.knowledge_graph._lemmatize_concept(c)
+                    node_concepts_set.add(node_c)
+
+                print("processed node concepts")
                 if not node_concepts_set.issubset(visited_concepts):
                     visited_concepts.update(node_concepts_set)
 
@@ -550,7 +564,7 @@ class QueryEngine:
                                 print("-" * 50)
 
                                 # Check if we have a complete answer after adding the neighbor's content
-                                is_complete, answer = self._check_answer(
+                                is_complete, answer = await self._check_answer(
                                     query, expanded_context
                                 )
                                 if is_complete:
@@ -558,17 +572,19 @@ class QueryEngine:
                                     break
 
                                 # Process the neighbor's concepts
-                                neighbor_concepts_set = set(
-                                    self.knowledge_graph._lemmatize_concept(c)
-                                    for c in neighbor_concepts
-                                )
+                                neighbor_concepts_set = set()
+                                for c in neighbor_concepts:
+                                    neigh_c = (
+                                        await self.knowledge_graph._lemmatize_concept(c)
+                                    )
+                                    neighbor_concepts_set.add(neigh_c)
                                 if not neighbor_concepts_set.issubset(visited_concepts):
                                     visited_concepts.update(neighbor_concepts_set)
 
                 # If we found a final answer, break out of the main loop
                 if final_answer:
                     break
-
+        print("Finding the final answer")
         # If we haven't found a complete answer, generate one using the LLM
         if not final_answer:
             print("\nGenerating final answer...")
@@ -578,11 +594,21 @@ class QueryEngine:
             )
             response_chain = response_prompt | self.llm
             input_data = {"query": query, "context": expanded_context}
-            final_answer = response_chain.invoke(input_data)
+
+            # Debugging: Print input data before invoking the response chain
+            print("Input Data for LLM:", input_data)
+
+            try:
+                final_answer = await asyncio.to_thread(
+                    response_chain.invoke, input_data
+                )
+            except Exception as e:
+                print("Error during LLM invocation:", str(e))
+                final_answer = "An error occurred while generating the answer."
 
         return expanded_context, traversal_path, filtered_content, final_answer
 
-    def query(self, query: str) -> Tuple[str, List[int], Dict[int, str]]:
+    async def query(self, query: str) -> Tuple[str, List[int], Dict[int, str]]:
         """
         Processes a query by retrieving relevant documents, expanding the context, and generating the final answer.
 
@@ -597,13 +623,13 @@ class QueryEngine:
         """
         with get_openai_callback() as cb:
             print(f"\nProcessing query: {query}")
-            relevant_docs = self._retrieve_relevant_documents(query)
+            relevant_docs = await self._retrieve_relevant_documents(query)
             (
                 expanded_context,
                 traversal_path,
                 filtered_content,
                 final_answer,
-            ) = self._expand_context(query, relevant_docs)
+            ) = await self._expand_context(query, relevant_docs)
 
             if not final_answer:
                 print("\nGenerating final answer...")
@@ -614,8 +640,9 @@ class QueryEngine:
 
                 response_chain = response_prompt | self.llm
                 input_data = {"query": query, "context": expanded_context}
-                response = response_chain.invoke(input_data)
-                final_answer = response
+                final_answer = await asyncio.to_thread(
+                    response_chain.invoke, input_data
+                )
             else:
                 print("\nComplete answer found during traversal.")
 
@@ -627,7 +654,7 @@ class QueryEngine:
 
         return final_answer, traversal_path, filtered_content
 
-    def _retrieve_relevant_documents(self, query: str):
+    async def _retrieve_relevant_documents(self, query: str):
         """
         Retrieves relevant documents based on the query using the vector store.
 
@@ -638,6 +665,7 @@ class QueryEngine:
         - list: A list of relevant documents.
         """
         print("\nRetrieving relevant documents...")
+
         retriever = self.vector_store.as_retriever(
             search_type="similarity", search_kwargs={"k": 5}
         )
@@ -645,13 +673,7 @@ class QueryEngine:
         compression_retriever = ContextualCompressionRetriever(
             base_compressor=compressor, base_retriever=retriever
         )
-        return compression_retriever.invoke(query)
-
-
-# Import necessary libraries
-import networkx as nx
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+        return await asyncio.to_thread(compression_retriever.invoke, query)
 
 
 # Define the Visualizer class
@@ -857,7 +879,7 @@ class GraphRAG:
         self.query_engine = None
         self.visualizer = Visualizer()
 
-    def process_documents(self, documents):
+    async def process_documents(self, documents):
         """
         Processes a list of documents by splitting them into chunks, embedding them, and building a knowledge graph.
 
@@ -867,11 +889,13 @@ class GraphRAG:
         Returns:
         - None
         """
-        splits, vector_store = self.document_processor.process_documents(documents)
-        self.knowledge_graph.build_graph(splits, self.llm, self.embedding_model)
+        splits, vector_store = await self.document_processor.process_documents(
+            documents
+        )
+        await self.knowledge_graph.build_graph(splits, self.llm, self.embedding_model)
         self.query_engine = QueryEngine(vector_store, self.knowledge_graph, self.llm)
 
-    def query(self, query: str):
+    async def query(self, query: str):
         """
         Handles a query by retrieving relevant information from the knowledge graph and visualizing the traversal path.
 
@@ -881,13 +905,14 @@ class GraphRAG:
         Returns:
         - str: The response to the query.
         """
-        response, traversal_path, filtered_content = self.query_engine.query(query)
+        response, traversal_path, filtered_content = await self.query_engine.query(
+            query
+        )
 
-        if traversal_path:
-            self.visualizer.visualize_traversal(
-                self.knowledge_graph.graph, traversal_path
-            )
-        else:
-            print("No traversal path to visualize.")
-
-        return response
+        result = {}
+        source_docs = [
+            Document(self.knowledge_graph.graph.nodes[i]["content"])
+            for i in filtered_content
+        ]
+        result = {"result": response, "source_documents": source_docs}
+        return result
