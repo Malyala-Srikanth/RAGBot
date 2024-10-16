@@ -4,7 +4,6 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.retrievers import ElasticsearchBM25Retriever
 from Utils.utils import logging
-from SimpplrChatbot.API.settings import settings
 
 
 class KeywordMatchRetriever:
