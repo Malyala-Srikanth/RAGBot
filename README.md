@@ -6,21 +6,28 @@ This is a simple fastapi application which contains query endpoint when called r
 
 ```
 SimpplrChatbot
-├── SimpplrChatbot                 -> Main Folder containing the code
-│    ├── API                       -> Code related to Rest API in fastapi
-│    │    ├── app.py               -> FastAPI Initialisation and lifespan manager initialisation
-│    │    └── settings.py          -> settings.py containing all the environment variables loaded in to settings object
-│    ├── Data                      -> Folder containing Code related to data operation
-│    │    ├── document_loaders.py  -> Contains Class which loads files from given path, preprocess it and
-│    │    └── splitters.py         -> Not yet implemented
-│    ├── Utils                     ->
-│    │    ├── utils.py             ->
-│    │    └── validation.py        -> Contains pydantic models used for validation
-│    ├── .env.example              -> example env
-│    └── asgi.py                   -> file to run fastapi localy (python3 -m asgi)
-├── docker-compose.yaml            -> docker-compose file containing elasticsearch server and backend app
-├── Dockerfile                     -> Dockerfile to build the application
-└── README.md                      -> Readme file explaining the folder structure and setting up the application.
+├── SimpplrChatbot                          -> Main Folder containing the code
+│    ├── API                                -> Code related to Rest API in fastapi
+│    │    ├── app.py                        -> FastAPI Initialisation and lifespan manager initialisation
+│    │    └── settings.py                   -> settings.py containing all the environment variables loaded in to settings object
+│    ├── Data                               -> Folder containing Code related to data operation
+│    │    ├── document_loaders.py           -> Contains Class which loads files from given path, preprocess it
+│    │    ├── embedding_based_retriver.py   -> contains class which is used to embed document using openaiembeddings and index in elasticsearch
+│    │    ├── keyword_match_retriever.py    -> contains class which is used to index in elasticsearch
+│    │    ├── knowledge_graph_retriever.py  -> Not yet implemented
+│    │    └── query_helper.py               -> Containing class which contains method to invoke the final chain
+│    ├── Utils                              ->
+│    │    ├── utils.py                      -> logger class is defined here
+│    │    └── validation.py                 -> Contains pydantic models used for validation
+│    ├── .env.example                       -> example env
+│    └── asgi.py                            -> file to run fastapi localy (python3 -m asgi)
+├── .gitignore
+├── .pre-commit-config.yaml
+├── docker-compose.yaml                     -> docker-compose file containing elasticsearch server and backend app
+├── Dockerfile                              -> Dockerfile to build the application
+├── poetry.lock                             -> final resolved dependencies
+├── pyproject.toml                          -> dependency manager
+└── README.md                               -> Readme file explaining the folder structure and setting up the application.
 ```
 
 ## How to SetUp

@@ -7,9 +7,14 @@ WORKDIR /app
 # Copy the required file contents into the container at /app
 COPY ./SimpplrChatbot /app
 
-# Install any needed packages specified in requirements.txt
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the poetry.lock and pyproject.toml files
+COPY pyproject.toml poetry.lock* ./
+
+# Install Poetry
+RUN pip install poetry
+
+# Install dependencies using Poetry
+RUN poetry install --no-root --no-dev
 
 # Make port 8000 available to the world outside this container
 EXPOSE 8000
