@@ -16,6 +16,7 @@ class EmbeddingBasedRetriever:
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200
         )
+        self.vector_store = None
 
     async def split_documents(self, documents: List[Document]) -> List[Document]:
         return await asyncio.to_thread(self.text_splitter.split_documents, documents)
