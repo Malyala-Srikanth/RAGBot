@@ -5,7 +5,10 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.retrievers.elastic_search_bm25 import (
     ElasticSearchBM25Retriever,
 )
+from elasticsearch import Elasticsearch
+from langchain.vectorstores import ElasticsearchStore
 from Utils.utils import logging
+from langchain.embeddings import OpenAIEmbeddings
 
 
 class KeywordMatchRetriever:
@@ -26,10 +29,13 @@ class KeywordMatchRetriever:
         logging.info(f"Split into {len(split_docs)} chunks")
 
         logging.info("Indexing documents with ElasticsearchBM25Retriever")
+        self.es_client = Elasticsearch(self.elasticsearch_url)
         self.retriever = ElasticSearchBM25Retriever(
-            elasticsearch_url=self.elasticsearch_url, index_name=self.index_name, k=5
+            client=self.es_client, index_name=self.index_name, k=5
         )
-        await asyncio.to_thread(self.retriever.add_documents, split_docs)
+        await asyncio.to_thread(
+            self.retriever.add_texts, [doc.page_content for doc in documents]
+        )
         logging.info("Indexing complete")
 
     async def retrieve(self, query: str, k: int = 5) -> List[Document]:

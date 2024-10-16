@@ -46,7 +46,7 @@ class QueryHelper:
                 self.index_name, self.elasticsearch_url
             )
             await self.keyword_match_retriever.index_documents(documents)
-            self.retriever = self.keyword_match_retriever.get_retriever()
+            self.retriever = await self.keyword_match_retriever.get_retriever()
         elif self.approach == "knowledge-graph":
             logger.info("Loading Knowledge Graph" + "*" * 2000)
             self.graph_rag = GraphRAG()
