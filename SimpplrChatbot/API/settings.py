@@ -1,8 +1,7 @@
 import os
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
-from SimpplrChatbot.Utils.validation import RetrieverApproach, RetrieverApproachEnum
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,15 +28,7 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     SPLITTER_TYPE: str = "recursive"
-    RETRIEVER_APPROACH: RetrieverApproach = Field(
-        default_factory=lambda: RetrieverApproach(
-            approach=RetrieverApproachEnum(
-                os.getenv(
-                    "RETRIEVER_APPROACH", RetrieverApproachEnum.EMBEDDING_BASED.value
-                )
-            )
-        )
-    )
+    RETRIEVER_APPROACH: str = os.getenv("RETRIEVER_APPROACH")
 
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
     DATA_PATH: str = os.getenv("DATA_PATH", "./data")

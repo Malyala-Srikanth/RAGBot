@@ -14,6 +14,7 @@ async def lifespan(app: FastAPI):
 
     # Initializing query helper
     query_helper = QueryHelper()
+    await query_helper.initialize()
     app.state.query_helper = query_helper
 
     yield

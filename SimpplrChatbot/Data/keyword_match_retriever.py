@@ -2,7 +2,9 @@ import asyncio
 from typing import List
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.retrievers import ElasticsearchBM25Retriever
+from langchain_community.retrievers.elastic_search_bm25 import (
+    ElasticSearchBM25Retriever,
+)
 from Utils.utils import logging
 
 
@@ -24,7 +26,7 @@ class KeywordMatchRetriever:
         logging.info(f"Split into {len(split_docs)} chunks")
 
         logging.info("Indexing documents with ElasticsearchBM25Retriever")
-        self.retriever = ElasticsearchBM25Retriever(
+        self.retriever = ElasticSearchBM25Retriever(
             elasticsearch_url=self.elasticsearch_url, index_name=self.index_name, k=5
         )
         await asyncio.to_thread(self.retriever.add_documents, split_docs)

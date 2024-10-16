@@ -7,9 +7,9 @@ class Question(BaseModel):
 
 
 class RetrieverApproachEnum(str, Enum):
-    EMBEDDING_BASED = "embedding-based"
-    KEYWORD_MATCH = "keyword-match"
-    KNOWLEDGE_GRAPH = "knowledge-graph"
+    EMBEDDING_BASED: str = "embedding-based"
+    KEYWORD_MATCH: str = "keyword-match"
+    KNOWLEDGE_GRAPH: str = "knowledge-graph"
 
 
 class RetrieverApproach(BaseModel):

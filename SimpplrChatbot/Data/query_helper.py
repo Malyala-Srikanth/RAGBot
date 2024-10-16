@@ -24,8 +24,6 @@ class QueryHelper:
         self.es_client = None  # We'll initialize this only if needed for BM25
         self.vector_store = None
         self.qa_chain = None
-        # run intialize here
-        asyncio.run(self.initialize())
 
     async def initialize(self):
         self.document_loader = DocumentLoader(settings.DATA_PATH)
@@ -51,7 +49,7 @@ class QueryHelper:
             await self.keyword_match_retriever.index_documents(documents)
             self.retriever = self.keyword_match_retriever.get_retriever()
         elif self.approach == "knowledge-graph":
-            documents = [doc.page_content for doc in documents]
+            logger.info("Loading Knowledge Graph" + "*" * 2000)
             self.graph_rag = GraphRAG()
             self.graph_rag.process_documents(documents)
         else:

@@ -5,7 +5,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import ElasticsearchStore
 from Utils.utils import logging
-from SimpplrChatbot.API.settings import settings
+from API.settings import settings
 
 
 class EmbeddingBasedRetriever:

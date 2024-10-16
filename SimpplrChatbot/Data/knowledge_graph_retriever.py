@@ -1,5 +1,5 @@
 import networkx as nx
-from langchain.vectorstores import FAISS
+from langchain.vectorstores import ElasticsearchStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import PromptTemplate
 from langchain.retrievers import ContextualCompressionRetriever
@@ -20,6 +20,8 @@ from nltk.stem import WordNetLemmatizer
 import nltk
 import spacy
 import heapq
+
+from API.settings import settings
 
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -66,7 +68,12 @@ class DocumentProcessor:
           - vector_store (FAISS): A FAISS vector store created from the split document chunks and their embeddings.
         """
         splits = self.text_splitter.split_documents(documents)
-        vector_store = FAISS.from_documents(splits, self.embeddings)
+        vector_store = ElasticsearchStore(
+            es_url=settings.ELASTICSEARCH_URL,
+            index_name=settings.INDEX_NAME,
+            embedding=self.embeddings,
+        )
+
         return splits, vector_store
 
     def create_embeddings_batch(self, texts, batch_size=32):

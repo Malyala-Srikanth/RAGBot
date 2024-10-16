@@ -26,12 +26,15 @@ services:
     image: docker.elastic.co/kibana/kibana:8.10.2
     container_name: kibana
     environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_HOSTS=http://elasticsearch-server:9200
     networks:
       - simpplr-chatbot
     ports:
       - "5601:5601"
-
+    depends_on:
+      elasticsearch-server:
+        condition: service_healthy
+        restart: true
   backend:
     build:
       context: .
@@ -66,7 +69,7 @@ services:
       - CHUNK_SIZE=${CHUNK_SIZE}
       - CHUNK_OVERLAP=${CHUNK_OVERLAP}
     entrypoint: /bin/bash
-    command: -c "uvicorn API.app:app --reload --host 0.0.0.0 --port 8000"
+    command: -c "poetry run uvicorn API.app:app --reload --host 0.0.0.0 --port 8000"
     networks:
       - simpplr-chatbot
 

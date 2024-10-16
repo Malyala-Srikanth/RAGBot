@@ -1,6 +1,7 @@
 # Use an official Python runtime as a parent image
 FROM python:3.9-slim
 
+ENV PATH="/root/.local/bin:$PATH"
 # Set the working directory in the container
 WORKDIR /app
 
@@ -23,4 +24,4 @@ EXPOSE 8000
 ENV PYTHONUNBUFFERED=1
 
 # Run app.py when the container launches
-CMD ["python", "-m", "asgi"]
+CMD ["poetry", "run", "python", "-m", "/app/asgi"]
