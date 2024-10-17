@@ -14,9 +14,9 @@ SimpplrChatbot
 │    │    ├── document_loaders.py           -> Contains Class which loads files from given path, preprocess it
 │    │    ├── embedding_based_retriver.py   -> contains class which is used to embed document using openaiembeddings and index in elasticsearch
 │    │    ├── keyword_match_retriever.py    -> contains class which is used to index in elasticsearch
-│    │    ├── knowledge_graph_retriever.py  -> Not yet implemented
+│    │    ├── knowledge_graph_retriever.py  -> Graph based context retriever using spacy, openAIembeddings and networkx
 │    │    └── query_helper.py               -> Containing class which contains method to invoke the final chain
-│    ├── Utils                              ->
+│    ├── Utils                              -> Folder containing files for utils used across repository
 │    │    ├── utils.py                      -> logger class is defined here
 │    │    └── validation.py                 -> Contains pydantic models used for validation
 │    ├── .env.example                       -> example env
