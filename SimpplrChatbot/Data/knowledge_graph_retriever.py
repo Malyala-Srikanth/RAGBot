@@ -54,9 +54,9 @@ class DocumentProcessor:
         - embeddings: An instance of OpenAIEmbeddings used for embedding documents.
         """
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200
+            chunk_size=settings.CHUNK_SIZE, chunk_overlap=settings.CHUNK_OVERLAP
         )
-        self.embeddings = OpenAIEmbeddings()
+        self.embeddings = OpenAIEmbeddings(model=settings.EMBEDDING_MODEL)
 
     async def process_documents(self, documents):
         """
@@ -872,7 +872,11 @@ class GraphRAG:
         - query_engine: An instance of the QueryEngine class for handling queries (initialized as None).
         - visualizer: An instance of the Visualizer class for visualizing the knowledge graph traversal.
         """
-        self.llm = ChatOpenAI(temperature=0, model_name="gpt-4o-mini", max_tokens=4000)
+        self.llm = ChatOpenAI(
+            temperature=settings.LLM_TEMPERATURE,
+            model_name=settings.LLM_MODEL,
+            max_tokens=settings.LLM_MAX_TOKENS,
+        )
         self.embedding_model = OpenAIEmbeddings()
         self.document_processor = DocumentProcessor()
         self.knowledge_graph = KnowledgeGraph()
