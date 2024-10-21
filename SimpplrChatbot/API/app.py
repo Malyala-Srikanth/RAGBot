@@ -56,7 +56,7 @@ async def query(question: Question):
 async def chat(session_id: str, new_query: Question):
     try:
         # Process the new query
-        result = app.state.query_helper.chat(new_query, session_id)
+        result = app.state.query_helper.chat(new_query.question, session_id)
         answer = result["result"]
         sources = [doc.page_content for doc in result["source_documents"]]
 
