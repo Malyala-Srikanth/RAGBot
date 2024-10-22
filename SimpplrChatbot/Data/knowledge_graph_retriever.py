@@ -877,7 +877,7 @@ class GraphRAG:
             model_name=settings.LLM_MODEL,
             max_tokens=settings.LLM_MAX_TOKENS,
         )
-        self.embedding_model = OpenAIEmbeddings()
+        self.embedding_model = OpenAIEmbeddings(model=settings.EMBEDDING_MODEL)
         self.document_processor = DocumentProcessor()
         self.knowledge_graph = KnowledgeGraph()
         self.query_engine = None
